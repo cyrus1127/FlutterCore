@@ -24,7 +24,8 @@ class _CheckerState extends State<Checker> with WidgetsBindingObserver {
     if (isDemo) {
     } else {}
 
-    Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
+    // Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
+    Navigator.of(context).pushNamedAndRemoveUntil('/welcome', (route) => false);
 
     return Future<void>.value();
   }

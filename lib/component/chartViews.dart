@@ -1,17 +1,218 @@
+import 'package:app_devbase_v1/component/dataObjects/dailyRecord.dart';
+import 'package:app_devbase_v1/component/dataObjects/pregnancy.dart';
+import 'package:app_devbase_v1/pages/afterLogin/pregnancyRecordCreate.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:app_devbase_v1/component/dataObjects/dailyRecord.dart';
-import 'package:app_devbase_v1/component/responsiveStatefulWidget.dart';
-import 'package:intl/intl.dart';
+
 
 /// TODO : use BarChartRodStackItem
+Widget pregnancyLineChart(List<PregnancyChartGuid> chartGuids,
+    List<PregnancyDailyRecord> coreData, DateTime start, int filter,
+    {double maxY = 100, String unit = 'cm'}) {
+  double maxXPad = 3;
+  double maxX = 26 + maxXPad; //chart lenght
+  LineChart chart;
+  List<LineChartBarData> chartDatas = [];
+
+  if (coreData.length == 0) {
+    // return Container();
+    coreData.add(new PregnancyDailyRecord(datetime: DateTime.now().toString()));
+  }
+
+  //add the basic range
+  {
+    List<FlSpot> SpotRodsBl = [];
+    List<FlSpot> SpotRodsBh = [];
+    List<FlSpot> SpotRodsBc = []; //base compare line
+    List<FlSpot> SpotRodsDa = [];
+    {
+      // if (index >= 1)
+      for (int index = 1; index < maxX - 1; index++) {
+        //handle baserange
+        if (index <= chartGuids.length) {
+          PregnancyChartGuid obj = chartGuids[index - 1];
+          double nMaxY = 0;
+
+          switch (filter) {
+            case 0:
+              SpotRodsBc.add(FlSpot(index.toDouble(), obj.crl));
+              nMaxY = obj.crl;
+              break;
+            case 1:
+              SpotRodsBl.add(
+                  FlSpot(index.toDouble(), obj.getUpLowBPD(true))); // base low
+              SpotRodsBh.add(FlSpot(
+                  index.toDouble(), obj.getUpLowBPD(false))); // base height
+              nMaxY = obj.getUpLowBPD(true);
+              break;
+            case 2:
+              SpotRodsBl.add(
+                  FlSpot(index.toDouble(), obj.getUpLowHC(true))); // base low
+              SpotRodsBh.add(FlSpot(
+                  index.toDouble(), obj.getUpLowHC(false))); // base height
+              nMaxY = obj.getUpLowHC(true);
+              break;
+            case 3:
+              SpotRodsBl.add(
+                  FlSpot(index.toDouble(), obj.getUpLowFL(true))); // base low
+              SpotRodsBh.add(FlSpot(
+                  index.toDouble(), obj.getUpLowFL(false))); // base height
+              nMaxY = obj.getUpLowFL(true);
+              break;
+            case 4:
+              SpotRodsBl.add(
+                  FlSpot(index.toDouble(), obj.getUpLowAC(true))); // base low
+              SpotRodsBh.add(FlSpot(
+                  index.toDouble(), obj.getUpLowAC(false))); // base height
+              nMaxY = obj.getUpLowAC(true);
+              break;
+          }
+          if (index == chartGuids.length - 1) {
+            maxY = nMaxY * 1.1;
+          }
+        }
+      }
+
+      //handle user record
+      coreData.forEach((element) {
+        //x = date
+        String exactDate = element.datetime.split(' ').first;
+        DateTime dExact = DateTime.parse(exactDate);
+        DateTime dWeek14 = start.subtract(Duration(days: 26 * 7));
+        double x = dExact.difference(dWeek14).inDays.toDouble() / 7;
+        double y = 0;
+        switch (filter) {
+          case 0:
+            y = element.crl;
+            break;
+          case 1:
+            y = element.bpd;
+            break;
+          case 2:
+            y = element.hc;
+            break;
+          case 3:
+            y = element.fl;
+            break;
+          case 4:
+            y = element.ac;
+            break;
+        }
+        if (x >= 0 && y > 0) SpotRodsDa.add(FlSpot(x, y));
+      });
+
+      if (filter > 0) {
+//add all datas -- base low & height
+        chartDatas.add(LineChartBarData(
+          spots: SpotRodsBl, isCurved: true,
+          // barWidth: 2,
+          colors: [Colors.transparent],
+          dotData: FlDotData(
+            show: false,
+          ),
+        ));
+        chartDatas.add(LineChartBarData(
+          spots: SpotRodsBh, isCurved: true,
+          // barWidth: 2,
+          colors: [Colors.transparent],
+          dotData: FlDotData(
+            show: false,
+          ),
+        ));
+      } else {
+        chartDatas.add(LineChartBarData(
+          spots: SpotRodsBc, isCurved: true,
+          // barWidth: 2,
+          colors: [Colors.blue],
+          dotData: FlDotData(
+            show: true,
+          ),
+        ));
+      }
+
+      //add all datas -- base anayls
+      chartDatas.add(LineChartBarData(
+        spots: SpotRodsDa, isCurved: true,
+        // barWidth: 2,
+        colors: [Color.fromRGBO(229, 96, 32, 1)],
+        dotData: FlDotData(
+          show: true,
+        ),
+      ));
+      print('timeChart data init done =-=-=-=-=-');
+    }
+
+//Final init the chart
+    chart = LineChart(LineChartData(
+      lineBarsData: chartDatas,
+      lineTouchData: LineTouchData(enabled: false),
+      maxY: maxY,
+      minY: 0,
+      titlesData: FlTitlesData(
+        show: true,
+        bottomTitles: SideTitles(
+            showTitles: true,
+            // getTitlesWidget: (value) {
+            //   if (value > 0) {
+            //     int dt = (13 + value).toInt();
+            //     return 'wk' + dt.toString();
+            //   }
+            //   return '';
+            // },
+            // getTextStyles: (context, value) {
+            //   return TextStyle(
+            //       fontSize: globalDataStore.getResponsiveSize(11),
+            //       fontFamily: 'SFProText',
+            //       fontStyle: FontStyle.normal,
+            //       fontWeight: FontWeight.w400,
+            //       colors:[ Color.fromRGBO(0, 0, 0, 0.5),
+            //       letterSpacing: -0.1);
+            // },
+            interval: 1),
+        leftTitles: SideTitles(
+          showTitles: true,
+          interval: (maxY / 50 >= 1 ? 10 : (maxY / 10 >= 1 ? 3 : 1.5)),
+          // getTextStyles: (context, value) {
+          //   return TextStyle(
+          //       fontSize: globalDataStore.getResponsiveSize(11),
+          //       fontFamily: 'SFProText',
+          //       fontStyle: FontStyle.normal,
+          //       fontWeight: FontWeight.w400,
+          //       colors:[ Color.fromRGBO(0, 0, 0, 0.5),
+          //       letterSpacing: -0.1);
+          // },
+        ),
+        topTitles: SideTitles(),
+        rightTitles: SideTitles(),
+      ),
+      borderData: FlBorderData(
+        show: false,
+      ),
+      gridData: FlGridData(show: false),
+      betweenBarsData: [
+        if (filter > 0) ...[
+          BetweenBarsData(
+            fromIndex: 0,
+            toIndex: 1,
+            colors: [Colors.red.withOpacity(0.3)],
+          )
+        ]
+      ],
+    )
+        // swapAnimationDuration: animDuration,
+        );
+  }
+
+  return chart;
+}
+
 Widget childWHLineChart(List<ChildChartGuid> chartGuids,
     List<DailyRecord> coreData, int onSelectedChartIndex,
     {double maxY = 120, String unit = 'cm'}) {
   maxY = onSelectedChartIndex == 7 ? 120 : 48;
-  double maxX_pad = 2;
-  double maxXV_pad = 0.5; //shift the position
-  double maxX = 7 + maxX_pad; //chart lenght
+  double maxXPad = 2;
+  double maxXVPad = 0.5; //shift the position
+  double maxX = 7 + maxXPad; //chart lenght
   LineChart chart;
   List<LineChartBarData> chartDatas = [];
 
@@ -21,10 +222,10 @@ Widget childWHLineChart(List<ChildChartGuid> chartGuids,
 
   //add the basic range
   {
-    List<FlSpot> SpotRods_bl = [];
-    List<FlSpot> SpotRods_bh = [];
-    List<FlSpot> SpotRods_bc = []; //base compare line
-    List<FlSpot> SpotRods_da = [];
+    List<FlSpot> SpotRodsBl = [];
+    List<FlSpot> SpotRodsBh = [];
+    List<FlSpot> SpotRodsBc = []; //base compare line
+    List<FlSpot> SpotRodsDa = [];
     {
       // if (index >= 1)
       for (int index = 1; index < maxX; index++) {
@@ -35,55 +236,55 @@ Widget childWHLineChart(List<ChildChartGuid> chartGuids,
           MeasureDataSet mds =
               onSelectedChartIndex == 7 ? obj.height : obj.weight;
 
-          if (index <= maxX - maxX_pad) {
-            SpotRods_bc.add(FlSpot(index.toDouble() + maxXV_pad, mds.median));
+          if (index <= maxX - maxXPad) {
+            SpotRodsBc.add(FlSpot(index.toDouble() + maxXVPad, mds.median));
           }
-          SpotRods_bl.add(FlSpot(index.toDouble(), mds.SDp3)); // base low
-          SpotRods_bh.add(FlSpot(index.toDouble(), mds.SDn3)); // base height
+          SpotRodsBl.add(FlSpot(index.toDouble(), mds.SDp3)); // base low
+          SpotRodsBh.add(FlSpot(index.toDouble(), mds.SDn3)); // base height
         }
       }
 
       //handle user record
       coreData.forEach((element) {
         //x = date
-        double x = coreData.indexOf(element).toDouble() + 1 + maxXV_pad;
+        double x = coreData.indexOf(element).toDouble() + 1 + maxXVPad;
         double y = element.amount.toDouble();
-        if (x >= 0 && y > 0) SpotRods_da.add(FlSpot(x, y));
+        if (x >= 0 && y > 0) SpotRodsDa.add(FlSpot(x, y));
       });
 
 //add all datas -- base low & height
       chartDatas.add(LineChartBarData(
-        spots: SpotRods_bl, isCurved: true,
+        spots: SpotRodsBl, isCurved: true,
         // barWidth: 2,
-        colors: [Colors.transparent],
+        colors:[ Colors.transparent],
         dotData: FlDotData(
           show: false,
         ),
       ));
       chartDatas.add(LineChartBarData(
-        spots: SpotRods_bh, isCurved: true,
+        spots: SpotRodsBh, isCurved: true,
         // barWidth: 2,
-        colors: [Colors.transparent],
+        colors:[ Colors.transparent],
         dotData: FlDotData(
           show: false,
         ),
       ));
 
       chartDatas.add(LineChartBarData(
-        spots: SpotRods_bc,
+        spots: SpotRodsBc,
         barWidth: 5,
-        colors: [Color.fromRGBO(0, 119, 192, 1)],
+        colors:[ Color.fromRGBO(0, 119, 192, 1)],
         dotData: FlDotData(
           show: true,
         ),
       ));
 
       //add all datas -- base anayls
-      if (SpotRods_da.length > 2) {
+      if (SpotRodsDa.length > 2) {
         chartDatas.add(LineChartBarData(
-          spots: SpotRods_da, isCurved: true,
+          spots: SpotRodsDa, isCurved: true,
           // barWidth: 2,
-          colors: [Color.fromRGBO(229, 96, 32, 1)],
+          colors:[ Color.fromRGBO(229, 96, 32, 1)],
           dotData: FlDotData(
             show: true,
           ),
@@ -101,37 +302,35 @@ Widget childWHLineChart(List<ChildChartGuid> chartGuids,
       minY: 0,
       titlesData: FlTitlesData(
         show: true,
-        bottomTitles: SideTitles(
+        bottomTitles: 
+        SideTitles(
             showTitles: true,
-            getTitles: (value) {
-              if (value > 0 && value % 1 != 0) {
-                int dt = (value).toInt();
-                return dt.toString();
-              }
-              return '';
-            },
-            getTextStyles: (context, value) {
-              return TextStyle(
-                  fontSize: globalDataStore.getResponsiveSize(11),
-                  fontFamily: 'SFProText',
-                  fontStyle: FontStyle.normal,
-                  fontWeight: FontWeight.w400,
-                  color: Color.fromRGBO(0, 0, 0, 0.5),
-                  letterSpacing: -0.1);
-            },
+            // getTitlesWidget: (value, meta) {
+              
+            // },
+            // getTextStyles: (context, value) {
+            //   return TextStyle(
+            //       fontSize: globalDataStore.getResponsiveSize(11),
+            //       fontFamily: 'SFProText',
+            //       fontStyle: FontStyle.normal,
+            //       fontWeight: FontWeight.w400,
+            //       colors:[ Color.fromRGBO(0, 0, 0, 0.5),
+            //       letterSpacing: -0.1);
+            // },
             interval: 0.5),
+        
         leftTitles: SideTitles(
           showTitles: true,
           interval: (maxY / 50 >= 1 ? 10 : (maxY / 10 >= 1 ? 3 : 1.5)),
-          getTextStyles: (context, value) {
-            return TextStyle(
-                fontSize: globalDataStore.getResponsiveSize(11),
-                fontFamily: 'SFProText',
-                fontStyle: FontStyle.normal,
-                fontWeight: FontWeight.w400,
-                color: Color.fromRGBO(0, 0, 0, 0.5),
-                letterSpacing: -0.1);
-          },
+          // getTextStyles: (context, value) {
+          //   return TextStyle(
+          //       fontSize: globalDataStore.getResponsiveSize(11),
+          //       fontFamily: 'SFProText',
+          //       fontStyle: FontStyle.normal,
+          //       fontWeight: FontWeight.w400,
+          //       colors:[ Color.fromRGBO(0, 0, 0, 0.5),
+          //       letterSpacing: -0.1);
+          // },
         ),
         topTitles: SideTitles(),
         rightTitles: SideTitles(),
@@ -144,7 +343,7 @@ Widget childWHLineChart(List<ChildChartGuid> chartGuids,
         BetweenBarsData(
           fromIndex: 0,
           toIndex: 1,
-          colors: [Color.fromRGBO(241, 163, 135, 0.1)],
+          colors:[ Color.fromRGBO(241, 163, 135, 0.1)],
         )
       ],
     )
@@ -176,6 +375,7 @@ Widget amountBarChart(
         int rodIndex,
       ) {
         return BarTooltipItem(
+          
           rod.y.round().toString() + unit,
           const TextStyle(
               color: Colors.black,
@@ -196,21 +396,21 @@ Widget amountBarChart(
         coreData.forEach((element) {
           //x = date
           String exactDate = element.datetime.split(' ').first;
-          DateTime d_exact = DateTime.parse(exactDate);
+          DateTime dExact = DateTime.parse(exactDate);
           DateTime d = DateTime.parse(element.datetime);
-          double x = d_exact.difference(start).inDays.toDouble();
+          double x = dExact.difference(start).inDays.toDouble();
           //y = time
           double y = element.amount.toDouble();
-          if (x == index) {
-            barRods.add(BarChartRodData(
-                y: y,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(10)),
-                colors: [
-                  x % 2 == 0
-                      ? Color.fromRGBO(229, 96, 32, 1)
-                      : Color.fromRGBO(249, 173, 27, 1)
-                ]));
-          }
+          // if (x == index) {
+          //   barRods.add(BarChartRodData(
+          //       y: y,
+          //       borderRadius: BorderRadius.vertical(top: Radius.circular(10)),
+          //       colors:[ [
+          //         x % 2 == 0
+          //             ? Color.fromRGBO(229, 96, 32, 1)
+          //             : Color.fromRGBO(249, 173, 27, 1)
+          //       ]));
+          // }
         });
 
         BarChartGroupData nSpot = BarChartGroupData(
@@ -229,32 +429,33 @@ Widget amountBarChart(
           show: true,
           bottomTitles: SideTitles(
             showTitles: true,
-            getTitles: (value) {
-              DateTime dt = start.add(Duration(days: value.toInt()));
-              return DateFormat.Md().format(dt);
-            },
-            getTextStyles: (context, value) {
-              return TextStyle(
-                  fontSize: globalDataStore.getResponsiveSize(11),
-                  fontFamily: 'SFProText',
-                  fontStyle: FontStyle.normal,
-                  fontWeight: FontWeight.w400,
-                  color: Color.fromRGBO(0, 0, 0, 0.5),
-                  letterSpacing: -0.1);
-            },
+            // getTitlesWidget: (value) {
+            //   DateTime dt = start.add(Duration(days: value.toInt()));
+            //   return DateFormat.Md().format(dt);
+            // },
+            // getTextStyles: (context, value) {
+            //   return TextStyle(
+            //       fontSize: globalDataStore.getResponsiveSize(11),
+            //       fontFamily: 'SFProText',
+            //       fontStyle: FontStyle.normal,
+            //       fontWeight: FontWeight.w400,
+            //       colors:[ Color.fromRGBO(0, 0, 0, 0.5),
+            //       letterSpacing: -0.1);
+            // },
           ),
+          
           leftTitles: SideTitles(
             showTitles: true,
             interval: maxY >= 100 ? 50 : 3,
-            getTextStyles: (context, value) {
-              return TextStyle(
-                  fontSize: globalDataStore.getResponsiveSize(11),
-                  fontFamily: 'SFProText',
-                  fontStyle: FontStyle.normal,
-                  fontWeight: FontWeight.w400,
-                  color: Color.fromRGBO(0, 0, 0, 0.5),
-                  letterSpacing: -0.1);
-            },
+            // getTextStyles: (context, value) {
+            //   return TextStyle(
+            //       fontSize: globalDataStore.getResponsiveSize(11),
+            //       fontFamily: 'SFProText',
+            //       fontStyle: FontStyle.normal,
+            //       fontWeight: FontWeight.w400,
+            //       colors:[ Color.fromRGBO(0, 0, 0, 0.5),
+            //       letterSpacing: -0.1);
+            // },
           ),
           topTitles: SideTitles(),
           rightTitles: SideTitles(),
@@ -314,44 +515,44 @@ Widget timeChartSpotStyle(List<DailyRecord> coreData, DateTime start) {
             leftTitles: SideTitles(
               showTitles: true,
               interval: 3,
-              // getTitles: (value) {
+              // getTitlesWidget: (value) {
               //   if (value >= 1 && value <= 24) {
               //     return value.toInt().toString();
               //   }
               //   return '';
               // },
-              getTextStyles: (context, value) {
-                return TextStyle(
-                    fontSize: globalDataStore.getResponsiveSize(11),
-                    fontFamily: 'SFProText',
-                    fontStyle: FontStyle.normal,
-                    fontWeight: FontWeight.w400,
-                    color: Color.fromRGBO(0, 0, 0, 0.5),
-                    letterSpacing: -0.1);
-              },
+              // getTextStyles: (context, value) {
+              //   return TextStyle(
+              //       fontSize: globalDataStore.getResponsiveSize(11),
+              //       fontFamily: 'SFProText',
+              //       fontStyle: FontStyle.normal,
+              //       fontWeight: FontWeight.w400,
+              //       colors:[ Color.fromRGBO(0, 0, 0, 0.5),
+              //       letterSpacing: -0.1);
+              // },
             ),
             rightTitles: SideTitles(),
             topTitles: SideTitles(),
             bottomTitles: SideTitles(
                 showTitles: true,
-                getTitles: (value) {
-                  if (value >= 1 && value <= 7) {
-                    DateTime dt = start.add(Duration(days: value.toInt() - 1));
-                    return DateFormat.Md().format(dt);
-                  }
-                  return '';
-                },
-                getTextStyles: (context, value) {
-                  return TextStyle(
-                      fontSize: globalDataStore.getResponsiveSize(11),
-                      fontFamily: 'SFProText',
-                      fontStyle: FontStyle.normal,
-                      fontWeight: FontWeight.w400,
-                      color: Color.fromRGBO(0, 0, 0, 0.5),
-                      letterSpacing: -0.1);
-                },
-                margin: 0,
-                interval: 1)),
+                // getTitlesWidget: (value) {
+                //   if (value >= 1 && value <= 7) {
+                //     DateTime dt = start.add(Duration(days: value.toInt() - 1));
+                //     return DateFormat.Md().format(dt);
+                //   }
+                //   return '';
+                // },
+                // getTextStyles: (context, value) {
+                //   return TextStyle(
+                //       fontSize: globalDataStore.getResponsiveSize(11),
+                //       fontFamily: 'SFProText',
+                //       fontStyle: FontStyle.normal,
+                //       fontWeight: FontWeight.w400,
+                //       colors:[ Color.fromRGBO(0, 0, 0, 0.5),
+                //       letterSpacing: -0.1);
+                // },
+                // margin: 0,
+                interval: 1),),
         scatterTouchData: ScatterTouchData(
           enabled: false,
         ),
